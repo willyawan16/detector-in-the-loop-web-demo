@@ -635,18 +635,22 @@ function renderAgg() {
     }
     agg[m] = t;
   }
-  const d = f1(agg.finetuned) - f1(agg.baseline);
+  // Headline = the paper's reported F1-max (full evaluation, each model at its own optimum, IoU 0.5).
+  // The counts underneath are this page's own recount at the baseline's threshold.
+  const paper = m => cur().models[m].paper_f1max;
+  const d = paper('finetuned') - paper('baseline');
   const crit = 'IoU ≥ ' + S.thr.toFixed(2);
 
   $('#agghint').textContent =
-    'All ' + items.length + ' image' + (items.length === 1 ? '' : 's')
+    'Large numbers: validation F1-max reported in the paper. Counts below: recounted on this page over all '
+    + items.length + ' image' + (items.length === 1 ? '' : 's')
     + ' in the split — not only the examples listed above — at ' + crit
-    + ', greedy one-to-one and class-agnostic. Both models scored at the baseline’s F1-max operating point '
-    + S.op.baseline.toFixed(4) + '.';
+    + ', greedy one-to-one and class-agnostic, with both models at the baseline’s threshold ('
+    + S.op.baseline.toFixed(4) + ').';
 
   $('#agg').innerHTML = MODELS.map(m =>
     '<div class="stat-tile"><h4>' + MODEL_LABEL[m] + '</h4>'
-    + '<div class="big">' + pct(f1(agg[m]), 2) + '<small>F1</small></div>'
+    + '<div class="big">' + pct(paper(m), 2) + '<small>F1-max (paper)</small></div>'
     + '<div class="cells">'
     + '<span>TP <b style="color:var(--tp)">' + agg[m].tp + '</b></span>'
     + '<span>loc <b style="color:var(--loc)">' + agg[m].loc + '</b></span>'
@@ -657,7 +661,7 @@ function renderAgg() {
     + '</div></div>').join('')
     + '<div class="stat-tile delta"><h4>Curated − baseline</h4>'
     + '<div class="big" style="color:' + (d >= 0 ? 'var(--tp)' : 'var(--fp)') + '">'
-    + pp(d) + '<small>pp ΔF1</small></div>'
+    + pp(d) + '<small>pp ΔF1-max (paper)</small></div>'
     + '<div class="cells">'
     + '<span>ΔTP <b>' + sgn(agg.finetuned.tp - agg.baseline.tp) + '</b></span>'
     + '<span>Δloc <b>' + sgn(agg.finetuned.loc - agg.baseline.loc) + '</b></span>'
