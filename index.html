@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Detector-in-the-Loop Synthetic Data Augmentation via Progressive Curation for Industrial Product Defect Detection</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230f1115'/%3E%3Crect x='5' y='7' width='13' height='12' fill='none' stroke='%2322c55e' stroke-width='3'/%3E%3Crect x='15' y='14' width='12' height='11' fill='none' stroke='%23f59e0b' stroke-width='3'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <h1>Detector-in-the-Loop Synthetic Data Augmentation via Progressive Curation for Industrial Product Defect Detection</h1>
+    <p class="subtitle">Interactive Demo &amp; Qualitative Results</p>
+    <p class="abstract">
+      The overview video explains the method. Below it, pick a dataset with the tabs and read down:
+      what the generator produces, what that data changes in the detector, and the totals over the
+      whole split. Drag across a generated
+      card to wipe between the synthetic defect and the clean template it was painted onto. In the
+      comparison, green is a correct detection, orange landed on a real defect but failed the IoU
+      rule, red hit nothing, and grey dashed is a defect that was missed. Pick any of the other
+      examples underneath to load it into the comparison. Nothing is pre-scored — drag the IoU
+      threshold to change what counts as correct.
+    </p>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="video-section">
+    <div class="sec-head">
+      <div>
+        <h2>Method overview</h2>
+        <p class="hint">A walkthrough of the generation and curation pipeline. The interactive
+          sections below let you check the result on each dataset.</p>
+      </div>
+    </div>
+    <div class="video-frame">
+      <video controls preload="metadata" poster="video/poster.jpg" playsinline>
+        <source src="video/paper_video.mp4" type="video/mp4" />
+        Your browser cannot play this video —
+        <a href="video/paper_video.mp4">open it directly</a>.
+      </video>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <section class="compare-section" id="gensection">
+    <div class="sec-head">
+      <div>
+        <h2>1 · What the pipeline generates</h2>
+        <p class="hint">Four kept samples, drawn at random from this dataset. Each pair is the
+          generated defect and the clean template it was painted onto — <b>drag left or right</b>
+          across a card to wipe between them.</p>
+      </div>
+      <button type="button" class="shuffle" id="shuffle">↻ Shuffle</button>
+    </div>
+    <div class="gen-grid" id="gengrid"></div>
+  </section>
+
+  <section class="picker-section">
+    <div class="picker-card">
+      <div class="picker-grid">
+
+        <div class="field" id="thrfield">
+          <label for="thr">IoU threshold <span class="num" id="thrval">0.50</span></label>
+          <input type="range" id="thr" min="0.05" max="0.95" step="0.05" value="0.5" />
+          <span class="note">Matching is greedy one-to-one in descending score order, class-agnostic,
+            on intersection over union — the COCO rule.</span>
+        </div>
+
+        <div class="field">
+          <label>Show on image</label>
+          <div class="checks">
+            <label class="chk"><input type="checkbox" id="showconf" checked /><span>Confidence</span></label>
+            <label class="chk"><input type="checkbox" id="showiou" checked /><span>IoU</span></label>
+            <label class="chk"><input type="checkbox" id="showhud" checked /><span>Image info</span></label>
+          </div>
+          <span class="note">Confidence and IoU label each prediction box; image info is the pill in
+            the bottom corner. Untick for a clean picture.</span>
+        </div>
+
+        <div class="field">
+          <label>Operating point <span class="num" id="opval">0.00</span></label>
+          <span class="note" id="ophint"></span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="compare-section">
+    <div class="sec-head">
+      <div>
+        <h2>2 · What that data changes in the detector</h2>
+        <p class="hint" id="dssub"></p>
+      </div>
+      <div class="legend">
+        <span class="lg"><svg class="sw" viewBox="0 0 22 14"><rect x="1.5" y="1.5" width="19" height="11" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3 2"/></svg>Ground truth</span>
+        <span class="lg"><svg class="sw" viewBox="0 0 22 14"><rect x="1.5" y="1.5" width="19" height="11" fill="none" stroke="#22c55e" stroke-width="2"/></svg>True positive</span>
+        <span class="lg"><svg class="sw" viewBox="0 0 22 14"><rect x="1.5" y="1.5" width="19" height="11" fill="none" stroke="#f59e0b" stroke-width="2"/></svg>Localization miss</span>
+        <span class="lg"><svg class="sw" viewBox="0 0 22 14"><rect x="1.5" y="1.5" width="19" height="11" fill="none" stroke="#ef4444" stroke-width="2"/></svg>False positive</span>
+        <span class="lg"><svg class="sw" viewBox="0 0 22 14"><rect x="1.5" y="1.5" width="19" height="11" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="3 2"/></svg>Missed GT</span>
+      </div>
+    </div>
+
+    <div class="imgbar">
+      <div class="nav">
+        <button type="button" id="prev" title="Previous image (←)" aria-label="Previous image">←</button>
+        <span class="pos" id="imgpos">0 / 0</span>
+        <button type="button" id="next" title="Next image (→)" aria-label="Next image">→</button>
+      </div>
+      <span class="imgid" id="imgid"></span>
+      <span id="imgtags"></span>
+      <span class="spacer"></span>
+      <span class="note">wheel to zoom · drag to pan · double-click to reset · all three panels share one view</span>
+    </div>
+
+    <div class="compare-grid">
+      <div class="compare-tile" data-model="gt">
+        <h3>Ground truth <span class="ckpt" data-r="meta"></span></h3>
+        <div class="stage" data-r="stage">
+          <div class="zoomwrap" data-r="zoom"><img data-r="img" alt="" /><svg data-r="svg"></svg></div>
+          <div class="hud" data-r="hud"></div>
+        </div>
+        <div class="tile-stats" data-r="stats"></div>
+      </div>
+      <div class="compare-tile" data-model="baseline">
+        <h3>Baseline — real data only <span class="ckpt" data-r="meta"></span></h3>
+        <div class="stage" data-r="stage">
+          <div class="zoomwrap" data-r="zoom"><img data-r="img" alt="" /><svg data-r="svg"></svg></div>
+          <div class="hud" data-r="hud"></div>
+        </div>
+        <div class="tile-stats" data-r="stats"></div>
+      </div>
+      <div class="compare-tile" data-model="finetuned">
+        <h3>After progressive curation <span class="ckpt" data-r="meta"></span></h3>
+        <div class="stage" data-r="stage">
+          <div class="zoomwrap" data-r="zoom"><img data-r="img" alt="" /><svg data-r="svg"></svg></div>
+          <div class="hud" data-r="hud"></div>
+        </div>
+        <div class="tile-stats" data-r="stats"></div>
+      </div>
+    </div>
+    <p class="opnote" id="opnote"></p>
+
+    <div class="subhead">
+      <h3>Other examples where curation helps</h3>
+      <p class="hint">Every image where the curated model beats the baseline, in one of three
+        ways. A defect counts as <em>found</em> when any prediction above the operating point
+        overlaps it at all, and a false positive counts only when a prediction overlaps
+        <em>no</em> annotation — so in both directions a detection that is visually right but fails
+        IoU still counts as a hit, not an error. The badge is the margin:
+        <b>+n ▲</b> defects found · <b>+0.nn</b> confidence · <b>−n ✕</b> false positives dropped.</p>
+    </div>
+    <div class="tagbar" id="tagfilter"></div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <section class="compare-section">
+    <div class="sec-head">
+      <div>
+        <h2>3 · Overall detection performance</h2>
+        <p class="hint" id="agghint"></p>
+      </div>
+    </div>
+    <div class="stat-grid" id="agg"></div>
+  </section>
+
+</main>
+
+<div id="loading">loading…</div>
+
+<!-- Data ships as script assignments rather than JSON, so the page works when opened
+     straight off the filesystem — browsers block fetch() under file://.
+     Regenerate with build_data.py after re-exporting. -->
+<script src="showcase_export/data/gen.js"></script>
+<script src="showcase_export/data/cs.js"></script>
+<script src="showcase_export/data/wood.js"></script>
+<script src="showcase_export/data/ai.js"></script>
+<script src="showcase_export/data/amf.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
