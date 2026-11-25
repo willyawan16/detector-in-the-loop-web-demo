@@ -174,6 +174,23 @@ const visibleImages = () => activeImages()
   .map(x => x.im);
 const imgById = id => cur().images.find(im => im.id === id);
 const imgSrc = im => DATA_DIR + '/images/' + S.ds + '/' + im.file;
+// 240 px copies for the example strip (make_thumbs.py); full images only in the comparison.
+const thumbSrc = im => DATA_DIR + '/thumbs/' + S.ds + '/' + im.file;
+// Fetch the neighbours' full images in the background so prev/next feels instant.
+const _warm = new Set();
+function warmNeighbours() {
+  const list = visibleImages();
+  const at = list.findIndex(x => x.id === S.imgId);
+  if (at < 0) return;
+  for (const k of [at + 1, at - 1, at + 2]) {
+    const im = list[(k + list.length) % list.length];
+    if (!im) continue;
+    const src = imgSrc(im);
+    if (_warm.has(src)) continue;
+    _warm.add(src);
+    new Image().src = src;
+  }
+}
 const stats = (im, model) => match(im.gt, im[model], S.op[model], S.thr);
 
 // ---------- boot ----------
@@ -319,8 +336,8 @@ function renderStrip() {
       title: win.reason + (im.tags.length ? ' · ' + im.tags.map(t => TAG_LABEL[t]).join(', ') : ''),
     });
     fig.dataset.id = im.id;
-    const img = el('img', { alt: im.id, loading: 'lazy' });
-    img.src = imgSrc(im);
+    const img = el('img', { alt: im.id, loading: 'lazy', decoding: 'async' });
+    img.src = thumbSrc(im);
     fig.append(img);
     const cap = el('figcaption');
     cap.append(el('span', { textContent: im.id.replace(S.ds + '_', '') }));
@@ -507,6 +524,7 @@ function renderAll() {
   $('#imgtags').innerHTML = im ? '<span class="chip win">' + winInfo(im).reason + '</span>' : '';
   PANELS.forEach(m => renderTile(m, im));
   renderAgg();
+  setTimeout(warmNeighbours, 300);   // after the current image has started loading
 }
 
 function renderTile(model, im) {
